@@ -3,6 +3,7 @@ import User from "../schema/user.js";
 import { StatusCodes } from "http-status-codes";
 import crudRepository from "./crudRepository.js";
 import ClientError from "../utils/errors/clientError.js";
+import channelRepository from "./channelRepository.js";
 const workspaceRepository = {
     ...crudRepository(Workspace),
     getWorkspaceByName : async function(workspaceName){
@@ -58,8 +59,34 @@ const workspaceRepository = {
       await workspace.save();
       return workspace;
     },
-    addchannelToWorkspace : async function(){},
-    fetchAllWorkspaceByMemberId : async function(){},
+    addchannelToWorkspace : async function(workspaceId,channelName){
+      const workspace = await Workspace.findById(workspaceId).populate('channels');
+      if(!workspace){
+        throw new ClientError({
+          message: "Workspace Not Found",
+          explanation: "Invalid data sent from the client",
+          statusCode: StatusCodes.NOT_FOUND,
+        });  // Throw a ClientError if workspace not found. 404 Not Found status code is appropriate for this case.
+      }
+      const isChannelAlreadyExists=workspace.channels.find(c=>c.name===channelName);
+      if(isChannelAlreadyExists){
+        throw new ClientError({
+          message: "Channel with the same name already exists",
+          explanation: "Invalid data sent from the client",
+          statusCode: StatusCodes.CONFLICT,
+        });  // Throw a ClientError if channel with the same name already exists. 409 Conflict status code is appropriate for this case.
+      }
+      const channel=await channelRepository.create({name:channelName});
+      workspace.channels.push(channel);
+      await workspace.save();
+      return workspace;
+    },
+    fetchAllWorkspaceByMemberId : async function(memberId){
+        const workspace = await Workspace.find({
+          'members.memberId': memberId
+        }).populate('members.memberId','usernmae email avatar');
+        return workspace;
+    },
     
    
   };
